@@ -1,0 +1,35 @@
+{
+    "dependencies": {
+        "@react-native-async-storage/async-storage": "^2.2.0",
+        "axios": "^1.13.2",
+        "bcryptjs": "^3.0.2",
+        "cloudinary": "^2.8.0",
+        "cors": "^2.8.5",
+        "crypto": "^1.0.1",
+        "dotenv": "^17.0.0",
+        "expo-device": "^8.0.10",
+        "express": "^5.1.0",
+        "get-video-duration": "^5.0.0",
+        "jsonwebtoken": "^9.0.2",
+        "libphonenumber-js": "^1.12.26",
+        "mongoose": "^8.16.1",
+        "multer": "^2.0.2",
+        "node-cron": "^4.2.1",
+        "nodemon": "^3.1.10",
+        "razorpay": "^2.9.6",
+        "react-phone-input-2": "^2.15.1"
+    },
+    "type": "module",
+    "name": "backend",
+    "version": "1.0.0",
+    "main": "src/index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "nodemon ./src/index.js",
+        "start": "node ./src/index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": ""
+}
