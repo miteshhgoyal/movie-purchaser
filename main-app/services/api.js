@@ -2,7 +2,8 @@
 import axios from 'axios';
 import { tokenService } from './tokenService.js';
 
-const API_BASE_URL = 'http://192.168.1.66:8000';
+const API_BASE_URL = 'https://movie-purchaser.onrender.com';
+// const API_BASE_URL = 'http://192.168.1.66:8000';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
