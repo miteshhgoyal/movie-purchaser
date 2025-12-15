@@ -197,8 +197,7 @@ router.get('/:movieId/details', authenticateToken, requireAdmin, async (req, res
     }
 });
 
-// Create new movie (FIXED - better error handling and retry logic)
-router.post('/movies',
+router.post('/',
     authenticateToken,
     requireAdmin,
     upload.fields([{ name: 'movieFile', maxCount: 1 }, { name: 'poster', maxCount: 1 }]),
@@ -301,7 +300,7 @@ router.post('/movies',
 );
 
 // Update movie
-router.put('/movies/:movieId',
+router.put('/:movieId',
     authenticateToken,
     requireAdmin,
     upload.single('poster'),
@@ -349,7 +348,7 @@ router.put('/movies/:movieId',
 );
 
 // Delete movie (FIXED - now deletes from Cloudinary too)
-router.delete('/movies/:movieId', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:movieId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const movie = await Movie.findOne({ movieId: req.params.movieId });
         if (!movie) {
@@ -385,7 +384,7 @@ router.delete('/movies/:movieId', authenticateToken, requireAdmin, async (req, r
 });
 
 // Toggle publish status
-router.put('/movies/:movieId/toggle-publish', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:movieId/toggle-publish', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const movie = await Movie.findOne({ movieId: req.params.movieId });
         if (!movie) {
