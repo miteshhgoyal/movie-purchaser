@@ -41,10 +41,11 @@ const upload = multer({
     fileFilter: fileFilter,
     limits: {
         fileSize: 2048 * 1024 * 1024,
+        files: 2,
+        fields: 10,
         fieldSize: 100 * 1024 * 1024,
         fieldNameSize: 100,
-        fields: 10,
-        files: 2
+        headerSize: 16384
     }
 });
 

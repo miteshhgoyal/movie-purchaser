@@ -43,8 +43,15 @@ app.use((err, req, res, next) => {
 
     if (err.message === 'File too large') {
         return res.status(413).json({
-            message: 'File size too large. Maximum size is 2 GB',
+            message: 'File size too large',
             error: 'PAYLOAD_TOO_LARGE'
+        });
+    }
+
+    if (err.message.includes('Unexpected end of form')) {
+        return res.status(400).json({
+            message: 'Multipart form data error',
+            error: 'FORM_PARSING_ERROR'
         });
     }
 
