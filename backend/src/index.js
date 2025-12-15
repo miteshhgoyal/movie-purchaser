@@ -16,15 +16,15 @@ const PORT = process.env.PORT || 8000;
 const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '2048mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2048mb' }));
 
-// Routes
 app.use("/movies", moviesRoutes);
 app.use("/payments", paymentsRoutes);
 app.use("/auth", authRoutes);
@@ -38,21 +38,26 @@ app.get('/', (req, res) => {
     });
 });
 
-// 404 handler
 app.use('*path', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
+
+    if (err.message === 'File too large') {
+        return res.status(413).json({
+            message: 'File size too large. Maximum size is 2 GB',
+            error: 'PAYLOAD_TOO_LARGE'
+        });
+    }
+
     res.status(500).json({
         message: 'Something went wrong!',
         error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
 });
 
-// Start server
 connectDB()
     .then(() => {
         app.listen(PORT, () => {

@@ -1,4 +1,3 @@
-// routes/movies.routes.js
 import express from 'express';
 import Movie from '../models/Movie.js';
 import Admin from '../models/Admin.js';
@@ -9,7 +8,6 @@ import { getVideoDurationInSeconds } from 'get-video-duration';
 
 const router = express.Router();
 
-// Helper - Admin Check
 const requireAdmin = async (req, res, next) => {
     try {
         const admin = await Admin.findById(req.user.userId);
@@ -22,11 +20,9 @@ const requireAdmin = async (req, res, next) => {
     }
 };
 
-// Helper - Generate unique Movie ID (FIXED - added retry logic)
 const generateMovieId = async (retries = 3) => {
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
-            // Find the last movie sorted by movieId in descending order
             const lastMovie = await Movie.findOne()
                 .sort({ movieId: -1 })
                 .select('movieId')
@@ -36,48 +32,35 @@ const generateMovieId = async (retries = 3) => {
                 return 'M10001';
             }
 
-            // Extract number from movieId (e.g., "M10001" -> 10001)
             const lastNum = parseInt(lastMovie.movieId.replace('M', ''));
-
-            // Generate next ID
             const nextNum = lastNum + 1;
             const newId = `M${nextNum}`;
 
-            // Check if this ID already exists (race condition prevention)
             const exists = await Movie.findOne({ movieId: newId });
             if (!exists) {
                 return newId;
             }
 
-            // If exists, retry with a small delay
             await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
             console.error(`Generate Movie ID attempt ${attempt + 1} failed:`, error);
             if (attempt === retries - 1) {
-                // Last attempt failed, use timestamp-based ID
                 return `M${Date.now()}`;
             }
         }
     }
 
-    // Fallback to timestamp-based ID
     return `M${Date.now()}`;
 };
 
-// Helper - Extract Cloudinary public_id from URL
 const getCloudinaryPublicId = (url) => {
     if (!url) return null;
     try {
-        // Extract public_id from Cloudinary URL
-        // Format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/v{version}/{public_id}.{format}
         const parts = url.split('/');
         const uploadIndex = parts.indexOf('upload');
         if (uploadIndex === -1) return null;
 
-        // Get everything after 'upload/v{version}/'
         const pathAfterUpload = parts.slice(uploadIndex + 2).join('/');
-
-        // Remove file extension
         const publicId = pathAfterUpload.substring(0, pathAfterUpload.lastIndexOf('.'));
         return publicId;
     } catch (error) {
@@ -86,7 +69,6 @@ const getCloudinaryPublicId = (url) => {
     }
 };
 
-// Helper - Delete file from Cloudinary
 const deleteFromCloudinary = async (url, resourceType = 'image') => {
     try {
         const publicId = getCloudinaryPublicId(url);
@@ -108,53 +90,6 @@ const deleteFromCloudinary = async (url, resourceType = 'image') => {
     }
 };
 
-// PUBLIC ROUTES
-router.get('/', async (req, res) => {
-    try {
-        const { search } = req.query;
-        let query;
-        // let query = { status: 'published' };
-
-        if (search) {
-            query.$or = [
-                { title: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } }
-            ];
-        }
-
-        const movies = await Movie.find(query)
-            .select('-filePath')
-            .sort({ createdAt: -1 })
-            .lean();
-
-        res.json({ success: true, movies });
-    } catch (error) {
-        console.error('Get movies error:', error);
-        res.status(500).json({ message: 'Failed to fetch movies' });
-    }
-});
-
-router.get('/:movieId', async (req, res) => {
-    try {
-        const movie = await Movie.findOne({ movieId: req.params.movieId })
-            .select('-filePath')
-            .lean();
-
-        console.log(movie);
-
-        // if (!movie || movie.status !== 'published') {
-        if (!movie) {
-            return res.status(404).json({ message: 'Movie not found' });
-        }
-
-        res.json({ success: true, movie });
-    } catch (error) {
-        console.error('Get movie error:', error);
-        res.status(500).json({ message: 'Failed to fetch movie' });
-    }
-});
-
-// ADMIN ROUTES
 router.get('/admin', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { search, status } = req.query;
@@ -183,7 +118,6 @@ router.get('/admin', authenticateToken, requireAdmin, async (req, res) => {
     }
 });
 
-// Get single movie details (admin)
 router.get('/:movieId/details', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const movie = await Movie.findOne({ movieId: req.params.movieId }).lean();
@@ -208,7 +142,6 @@ router.post('/',
         try {
             const { title, description, price } = req.body;
 
-            // Validation
             if (!title || !price) {
                 return res.status(400).json({ message: 'Title and price required' });
             }
@@ -217,7 +150,6 @@ router.post('/',
                 return res.status(400).json({ message: 'Movie file required' });
             }
 
-            // Calculate video duration from file
             const videoPath = req.files.movieFile[0].path;
             let durationSeconds = 0;
 
@@ -228,16 +160,14 @@ router.post('/',
                 durationSeconds = 0;
             }
 
-            // Upload movie file to Cloudinary
             const movieResult = await cloudinary.uploader.upload(videoPath, {
                 resource_type: 'video',
                 folder: 'ott/movies',
                 chunk_size: 6000000,
-                timeout: 120000
+                timeout: 1200000
             });
             uploadedVideoUrl = movieResult.secure_url;
 
-            // Upload poster if provided
             if (req.files.poster) {
                 const posterResult = await cloudinary.uploader.upload(req.files.poster[0].path, {
                     folder: 'ott/posters',
@@ -248,11 +178,9 @@ router.post('/',
                 uploadedPosterUrl = posterResult.secure_url;
             }
 
-            // Generate unique Movie ID with retry logic
             const movieId = await generateMovieId();
             console.log('Generated Movie ID:', movieId);
 
-            // Create movie document
             const movie = new Movie({
                 movieId,
                 title,
@@ -276,7 +204,6 @@ router.post('/',
         } catch (error) {
             console.error('Create movie error:', error);
 
-            // Rollback: Delete uploaded files if movie creation failed
             if (uploadedVideoUrl) {
                 await deleteFromCloudinary(uploadedVideoUrl, 'video');
             }
@@ -284,7 +211,6 @@ router.post('/',
                 await deleteFromCloudinary(uploadedPosterUrl, 'image');
             }
 
-            // Handle duplicate key error
             if (error.code === 11000) {
                 return res.status(409).json({
                     message: 'Duplicate movie ID detected. Please try again.',
@@ -299,7 +225,6 @@ router.post('/',
     }
 );
 
-// Update movie
 router.put('/:movieId',
     authenticateToken,
     requireAdmin,
@@ -314,7 +239,6 @@ router.put('/:movieId',
                 price: price ? parseFloat(price) : undefined
             };
 
-            // Upload new poster if provided
             if (req.file) {
                 const posterResult = await cloudinary.uploader.upload(req.file.path, {
                     folder: 'ott/posters',
@@ -347,7 +271,6 @@ router.put('/:movieId',
     }
 );
 
-// Delete movie (FIXED - now deletes from Cloudinary too)
 router.delete('/:movieId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const movie = await Movie.findOne({ movieId: req.params.movieId });
@@ -355,7 +278,6 @@ router.delete('/:movieId', authenticateToken, requireAdmin, async (req, res) => 
             return res.status(404).json({ message: 'Movie not found' });
         }
 
-        // Delete files from Cloudinary
         const deletionResults = {
             video: false,
             poster: false
@@ -369,7 +291,6 @@ router.delete('/:movieId', authenticateToken, requireAdmin, async (req, res) => 
             deletionResults.poster = await deleteFromCloudinary(movie.posterPath, 'image');
         }
 
-        // Delete from database
         await Movie.findOneAndDelete({ movieId: req.params.movieId });
 
         res.json({
@@ -383,7 +304,6 @@ router.delete('/:movieId', authenticateToken, requireAdmin, async (req, res) => 
     }
 });
 
-// Toggle publish status
 router.put('/:movieId/toggle-publish', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const movie = await Movie.findOne({ movieId: req.params.movieId });
@@ -403,6 +323,49 @@ router.put('/:movieId/toggle-publish', authenticateToken, requireAdmin, async (r
     } catch (error) {
         console.error('Toggle publish error:', error);
         res.status(500).json({ message: 'Failed to toggle publish status' });
+    }
+});
+
+router.get('/', async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query;
+
+        if (search) {
+            query.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const movies = await Movie.find(query)
+            .select('-filePath')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        res.json({ success: true, movies });
+    } catch (error) {
+        console.error('Get movies error:', error);
+        res.status(500).json({ message: 'Failed to fetch movies' });
+    }
+});
+
+router.get('/:movieId', async (req, res) => {
+    try {
+        const movie = await Movie.findOne({ movieId: req.params.movieId })
+            .select('-filePath')
+            .lean();
+
+        console.log(movie);
+
+        if (!movie) {
+            return res.status(404).json({ message: 'Movie not found' });
+        }
+
+        res.json({ success: true, movie });
+    } catch (error) {
+        console.error('Get movie error:', error);
+        res.status(500).json({ message: 'Failed to fetch movie' });
     }
 });
 
