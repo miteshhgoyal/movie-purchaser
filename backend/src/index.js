@@ -22,15 +22,8 @@ app.use(cors({
     maxAge: 86400
 }));
 
-app.options('*', cors());
-
 app.use(express.json({ limit: '2048mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2048mb' }));
-
-app.use("/movies", moviesRoutes);
-app.use("/payments", paymentsRoutes);
-app.use("/auth", authRoutes);
-app.use("/admin", adminRoutes);
 
 app.get('/', (req, res) => {
     res.json({
@@ -40,9 +33,10 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use((req, res) => {
-    res.status(404).json({ message: 'Route not found' });
-});
+app.use("/movies", moviesRoutes);
+app.use("/payments", paymentsRoutes);
+app.use("/auth", authRoutes);
+app.use("/admin", adminRoutes);
 
 app.use((err, req, res, next) => {
     console.error('Error:', err.stack);
