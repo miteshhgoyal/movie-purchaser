@@ -1,3 +1,3 @@
 export const CONFIG = {
-    systemName: "Movie Purchase Admin",
+    systemName: "Film Access Manager",
 }
