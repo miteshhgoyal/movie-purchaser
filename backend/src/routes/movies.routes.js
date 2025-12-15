@@ -5,6 +5,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 import upload from '../middlewares/multer.middleware.js';
 import { getVideoDurationInSeconds } from 'get-video-duration';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -90,6 +91,34 @@ const deleteFromCloudinary = async (url, resourceType = 'image') => {
     }
 };
 
+const cleanupFiles = (files) => {
+    if (!files) return;
+
+    if (files.movieFile) {
+        files.movieFile.forEach(file => {
+            try {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            } catch (err) {
+                console.error(`Error deleting file ${file.path}:`, err);
+            }
+        });
+    }
+
+    if (files.poster) {
+        files.poster.forEach(file => {
+            try {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            } catch (err) {
+                console.error(`Error deleting file ${file.path}:`, err);
+            }
+        });
+    }
+};
+
 router.get('/admin', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { search, status } = req.query;
@@ -143,10 +172,12 @@ router.post('/',
             const { title, description, price } = req.body;
 
             if (!title || !price) {
+                cleanupFiles(req.files);
                 return res.status(400).json({ message: 'Title and price required' });
             }
 
-            if (!req.files.movieFile) {
+            if (!req.files || !req.files.movieFile) {
+                cleanupFiles(req.files);
                 return res.status(400).json({ message: 'Movie file required' });
             }
 
@@ -194,6 +225,7 @@ router.post('/',
 
             await movie.save();
 
+            cleanupFiles(req.files);
             console.log('Movie created successfully:', movieId);
 
             res.status(201).json({
@@ -203,6 +235,8 @@ router.post('/',
             });
         } catch (error) {
             console.error('Create movie error:', error);
+
+            cleanupFiles(req.files);
 
             if (uploadedVideoUrl) {
                 await deleteFromCloudinary(uploadedVideoUrl, 'video');
@@ -247,6 +281,14 @@ router.put('/:movieId',
                     crop: 'fill'
                 });
                 updateData.posterPath = posterResult.secure_url;
+
+                try {
+                    if (fs.existsSync(req.file.path)) {
+                        fs.unlinkSync(req.file.path);
+                    }
+                } catch (err) {
+                    console.error(`Error deleting file ${req.file.path}:`, err);
+                }
             }
 
             const movie = await Movie.findOneAndUpdate(
@@ -266,6 +308,17 @@ router.put('/:movieId',
             });
         } catch (error) {
             console.error('Update movie error:', error);
+
+            if (req.file) {
+                try {
+                    if (fs.existsSync(req.file.path)) {
+                        fs.unlinkSync(req.file.path);
+                    }
+                } catch (err) {
+                    console.error(`Error deleting file ${req.file.path}:`, err);
+                }
+            }
+
             res.status(500).json({ message: 'Failed to update movie' });
         }
     }
@@ -329,7 +382,7 @@ router.put('/:movieId/toggle-publish', authenticateToken, requireAdmin, async (r
 router.get('/', async (req, res) => {
     try {
         const { search } = req.query;
-        let query;
+        let query = {};
 
         if (search) {
             query.$or = [
@@ -355,8 +408,6 @@ router.get('/:movieId', async (req, res) => {
         const movie = await Movie.findOne({ movieId: req.params.movieId })
             .select('-filePath')
             .lean();
-
-        console.log(movie);
 
         if (!movie) {
             return res.status(404).json({ message: 'Movie not found' });
