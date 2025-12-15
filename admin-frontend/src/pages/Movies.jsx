@@ -1,4 +1,3 @@
-// pages/Movies.jsx - COMPLETE FILE
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import {
@@ -75,7 +74,7 @@ const Movies = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await api.get("/movies/admin/movies", {
+      const response = await api.get("/movies", {
         params: {
           search: searchTerm || undefined,
           status: statusFilter !== "all" ? statusFilter : undefined,
@@ -109,7 +108,7 @@ const Movies = () => {
       uploadData.append("movieFile", movieFile);
       if (posterFile) uploadData.append("poster", posterFile);
 
-      await api.post("/movies/admin/movies", uploadData, {
+      await api.post("/movies", uploadData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           const progress = Math.round(
@@ -152,13 +151,9 @@ const Movies = () => {
       updateData.append("price", editFormData.price);
       if (editPosterFile) updateData.append("poster", editPosterFile);
 
-      await api.put(
-        `/movies/admin/movies/${selectedMovie.movieId}`,
-        updateData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      await api.put(`/movies/${selectedMovie.movieId}`, updateData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       setSuccess("Movie updated successfully");
       setShowEditModal(false);
@@ -173,10 +168,11 @@ const Movies = () => {
     }
   };
 
+  // ✅ FIXED: Removed /admin/movies prefix
   const handleDeleteMovie = async () => {
     setSubmitting(true);
     try {
-      await api.delete(`/movies/admin/movies/${selectedMovie.movieId}`);
+      await api.delete(`/movies/${selectedMovie.movieId}`);
       setSuccess("Movie deleted successfully");
       setShowDeleteModal(false);
       setSelectedMovie(null);
@@ -190,7 +186,7 @@ const Movies = () => {
 
   const togglePublish = async (movie) => {
     try {
-      await api.put(`/movies/admin/movies/${movie.movieId}/toggle-publish`);
+      await api.put(`/movies/${movie.movieId}/toggle-publish`);
       setSuccess(
         `Movie ${movie.status === "published" ? "unpublished" : "published"}`
       );
@@ -202,9 +198,7 @@ const Movies = () => {
 
   const openDetailModal = async (movie) => {
     try {
-      const response = await api.get(
-        `/movies/admin/movies/${movie.movieId}/details`
-      );
+      const response = await api.get(`/movies/${movie.movieId}/details`);
       setSelectedMovie(response.data.movie);
       setShowDetailModal(true);
     } catch (e) {
@@ -225,9 +219,7 @@ const Movies = () => {
 
   const openVideoModal = async (movie) => {
     try {
-      const response = await api.get(
-        `/movies/admin/movies/${movie.movieId}/details`
-      );
+      const response = await api.get(`/movies/${movie.movieId}/details`);
       setSelectedMovie(response.data.movie);
       setShowVideoModal(true);
     } catch (e) {
@@ -1224,11 +1216,11 @@ const Movies = () => {
                   </div>
                 </div>
 
-                {selectedMovie.posterUrl && (
+                {selectedMovie.posterPath && (
                   <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-400 mb-2">Poster</p>
                     <img
-                      src={selectedMovie.posterUrl}
+                      src={selectedMovie.posterPath}
                       alt={selectedMovie.title}
                       className="w-full h-64 object-cover rounded-lg"
                     />
@@ -1282,12 +1274,12 @@ const Movies = () => {
             </div>
 
             <div className="p-6">
-              {selectedMovie.videoUrl ? (
+              {selectedMovie.filePath ? (
                 <video
                   controls
                   autoPlay
                   className="w-full rounded-lg bg-black"
-                  src={selectedMovie.videoUrl}
+                  src={selectedMovie.filePath}
                 >
                   Your browser does not support the video tag.
                 </video>
