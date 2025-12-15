@@ -14,10 +14,25 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 const corsOptions = {
-    origin: '*',
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:3000',
+            'https://movie-purchaser.vercel.app',
+            'https://movie-purchaser.com',
+            'https://movie-api.ott-tube.in'
+        ];
+
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(null, true);
+        }
+    },
     methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Length', 'Content-Type']
 };
 
 app.use(cors(corsOptions));
