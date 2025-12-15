@@ -13,29 +13,16 @@ import adminRoutes from "./routes/admin.routes.js";
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-const corsOptions = {
-    origin: function (origin, callback) {
-        const allowedOrigins = [
-            'http://localhost:5173',
-            'http://localhost:3000',
-            'https://movie-purchaser.vercel.app',
-            'https://movie-purchaser.com',
-            'https://movie-api.ott-tube.in'
-        ];
-
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(null, true);
-        }
-    },
-    methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
+app.use(cors({
+    origin: true,
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Length', 'Content-Type']
-};
+    methods: ['GET', 'POST', 'DELETE', 'PATCH', 'PUT', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    maxAge: 86400
+}));
 
-app.use(cors(corsOptions));
+app.options('*', cors());
 
 app.use(express.json({ limit: '2048mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2048mb' }));
@@ -53,7 +40,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('*path', (req, res) => {
+app.use('*', (req, res) => {
     res.status(404).json({ message: 'Route not found' });
 });
 
