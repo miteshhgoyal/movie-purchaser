@@ -17,7 +17,8 @@
         "node-cron": "^4.2.1",
         "nodemon": "^3.1.10",
         "razorpay": "^2.9.6",
-        "react-phone-input-2": "^2.15.1"
+        "react-phone-input-2": "^2.15.1",
+        "uuid": "^13.0.0"
     },
     "type": "module",
     "name": "backend",
