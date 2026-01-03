@@ -64,6 +64,7 @@
     "react-native-otp-inputs": "^7.4.0",
     "react-native-pdf": "^6.7.7",
     "react-native-qrcode-svg": "^6.3.15",
+    "react-native-razorpay": "^2.3.1",
     "react-native-reanimated": "~4.1.1",
     "react-native-responsive-screen": "^1.4.2",
     "react-native-safe-area-context": "~5.6.0",

@@ -165,7 +165,7 @@ export default function MovieDetailsScreen() {
                 description: `Rent: ${displayMovie.title}`,
                 image: displayMovie.posterPath || 'https://your-app-logo-url.com/logo.png', // Add your app logo URL
                 currency: currency || 'INR',
-                key: key || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID, // Use env variable
+                key: key,
                 amount: (amount * 100).toString(), // Convert to paise/smallest currency unit
                 name: 'Your OTT Platform Name', // Replace with your app name
                 order_id: razorpayOrderId,
