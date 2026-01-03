@@ -10,12 +10,14 @@ import {
     Alert,
     Modal,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
+import RazorpayCheckout from 'react-native-razorpay';
 import api from "@/services/api";
 
 export default function MovieDetailsScreen() {
@@ -39,6 +41,7 @@ export default function MovieDetailsScreen() {
             }
         } catch (error) {
             console.error('Error fetching movie details:', error);
+            Alert.alert('Error', 'Failed to load movie details');
         } finally {
             setLoading(false);
         }
@@ -128,7 +131,7 @@ export default function MovieDetailsScreen() {
                     movieId: displayMovie.movieId || displayMovie._id,
                     title: displayMovie.title,
                     accessToken: accessInfo.token,
-                    videoUrl: displayMovie.filePath // Pass video URL directly
+                    videoUrl: displayMovie.filePath
                 }
             });
         } else {
@@ -137,7 +140,7 @@ export default function MovieDetailsScreen() {
         }
     };
 
-    // Handle payment
+    // Handle payment with Razorpay
     const handlePayment = async () => {
         try {
             setProcessingPayment(true);
@@ -145,53 +148,97 @@ export default function MovieDetailsScreen() {
             // Get device ID
             const deviceId = Device.osInternalBuildId || Device.modelId || 'unknown_device';
 
-            // Create payment order
+            // Create payment order on backend
             const orderResponse = await api.post('/payments/create-order', {
                 movieId: displayMovie.movieId,
                 deviceId: deviceId
             });
 
             if (!orderResponse.data.success) {
-                throw new Error('Failed to create payment order');
+                throw new Error(orderResponse.data.message || 'Failed to create payment order');
             }
 
-            const { orderId, amount, razorpayOrderId } = orderResponse.data;
+            const { orderId, razorpayOrderId, amount, currency, key } = orderResponse.data;
 
-            // TODO: Integrate Razorpay SDK here
-            // For now, simulate successful payment
-            Alert.alert(
-                'Payment Simulation',
-                'In production, Razorpay payment gateway will open here.\n\nSimulating successful payment...',
-                [
-                    {
-                        text: 'Simulate Success',
-                        onPress: async () => {
-                            await verifyPayment(orderId, razorpayOrderId, 'simulated_payment_id');
-                        }
-                    },
-                    {
-                        text: 'Cancel',
-                        style: 'cancel',
-                        onPress: () => setProcessingPayment(false)
+            // Prepare Razorpay checkout options
+            const options = {
+                description: `Rent: ${displayMovie.title}`,
+                image: displayMovie.posterPath || 'https://your-app-logo-url.com/logo.png', // Add your app logo URL
+                currency: currency || 'INR',
+                key: key || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID, // Use env variable
+                amount: (amount * 100).toString(), // Convert to paise/smallest currency unit
+                name: 'Your OTT Platform Name', // Replace with your app name
+                order_id: razorpayOrderId,
+                prefill: {
+                    email: '',
+                    contact: '',
+                    name: ''
+                },
+                theme: {
+                    color: '#ef4444' // Red color matching your UI
+                },
+                modal: {
+                    ondismiss: () => {
+                        setProcessingPayment(false);
+                        Alert.alert('Payment Cancelled', 'You cancelled the payment process');
                     }
-                ]
-            );
+                },
+                notes: {
+                    movieId: displayMovie.movieId,
+                    orderId: orderId
+                }
+            };
+
+            // Open Razorpay Checkout
+            RazorpayCheckout.open(options)
+                .then(async (data) => {
+                    // Payment success
+                    console.log('Payment Success:', data);
+
+                    // Verify payment on backend
+                    await verifyPayment(
+                        orderId,
+                        razorpayOrderId,
+                        data.razorpay_payment_id,
+                        data.razorpay_signature
+                    );
+                })
+                .catch((error) => {
+                    // Payment failure
+                    console.error('Payment Error:', error);
+                    setProcessingPayment(false);
+
+                    let errorMessage = 'Payment failed. Please try again.';
+
+                    if (error.code === 2) {
+                        errorMessage = 'Network error. Please check your connection.';
+                    } else if (error.code === 0) {
+                        errorMessage = 'Payment was cancelled.';
+                    } else if (error.description) {
+                        errorMessage = error.description;
+                    }
+
+                    Alert.alert('Payment Failed', errorMessage);
+                });
 
         } catch (error) {
-            console.error('Payment error:', error);
-            Alert.alert('Error', error.response?.data?.message || 'Payment failed. Please try again.');
+            console.error('Payment initiation error:', error);
             setProcessingPayment(false);
+            Alert.alert(
+                'Error',
+                error.response?.data?.message || error.message || 'Failed to initiate payment. Please try again.'
+            );
         }
     };
 
     // Verify payment and get access
-    const verifyPayment = async (orderId, razorpayOrderId, razorpayPaymentId) => {
+    const verifyPayment = async (orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
         try {
             const response = await api.post('/payments/verify', {
                 orderId: orderId,
                 razorpayOrderId: razorpayOrderId,
                 razorpayPaymentId: razorpayPaymentId,
-                razorpaySignature: 'simulated_signature'
+                razorpaySignature: razorpaySignature
             });
 
             if (response.data.success) {
@@ -206,23 +253,43 @@ export default function MovieDetailsScreen() {
                 setShowPaymentModal(false);
                 setProcessingPayment(false);
 
-                // Immediately navigate to video player
-                router.push({
-                    pathname: '/video-player',
-                    params: {
-                        movieId: displayMovie.movieId || displayMovie._id,
-                        title: displayMovie.title,
-                        accessToken: access.token,
-                        videoUrl: displayMovie.filePath
-                    }
-                });
+                // Show success message
+                Alert.alert(
+                    'Payment Successful! 🎉',
+                    'You can now watch the movie. Enjoy!',
+                    [
+                        {
+                            text: 'Watch Now',
+                            onPress: () => {
+                                router.push({
+                                    pathname: '/video-player',
+                                    params: {
+                                        movieId: displayMovie.movieId || displayMovie._id,
+                                        title: displayMovie.title,
+                                        accessToken: access.token,
+                                        videoUrl: displayMovie.filePath
+                                    }
+                                });
+                            }
+                        }
+                    ]
+                );
             } else {
-                throw new Error('Payment verification failed');
+                throw new Error(response.data.message || 'Payment verification failed');
             }
         } catch (error) {
             console.error('Verification error:', error);
-            Alert.alert('Error', 'Payment verification failed. Please contact support.');
             setProcessingPayment(false);
+            Alert.alert(
+                'Verification Failed',
+                error.response?.data?.message || 'Payment verification failed. Please contact support with your payment ID.',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => setShowPaymentModal(false)
+                    }
+                ]
+            );
         }
     };
 
@@ -237,6 +304,15 @@ export default function MovieDetailsScreen() {
         filePath: params.filePath,
         ...(movie || {})
     };
+
+    if (loading && !movie) {
+        return (
+            <SafeAreaView className="flex-1 bg-gray-900 items-center justify-center">
+                <ActivityIndicator size="large" color="#ef4444" />
+                <Text className="text-gray-400 mt-4">Loading movie details...</Text>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView className="flex-1 bg-gray-900" edges={['top', 'bottom']}>
@@ -498,7 +574,12 @@ export default function MovieDetailsScreen() {
                                 }}
                             >
                                 {processingPayment ? (
-                                    <ActivityIndicator color="#fff" />
+                                    <View className="flex-row items-center">
+                                        <ActivityIndicator color="#fff" />
+                                        <Text className="text-white font-bold text-lg ml-2">
+                                            Processing...
+                                        </Text>
+                                    </View>
                                 ) : (
                                     <View className="flex-row items-center">
                                         <Ionicons name="card" size={24} color="#fff" />
@@ -509,9 +590,12 @@ export default function MovieDetailsScreen() {
                                 )}
                             </TouchableOpacity>
 
-                            <Text className="text-gray-500 text-xs text-center">
-                                Secured by Razorpay Payment Gateway
-                            </Text>
+                            <View className="flex-row items-center justify-center mb-4">
+                                <Ionicons name="shield-checkmark" size={20} color="#22c55e" />
+                                <Text className="text-gray-500 text-xs text-center ml-2">
+                                    Secured by Razorpay Payment Gateway
+                                </Text>
+                            </View>
                         </ScrollView>
                     </View>
                 </View>
